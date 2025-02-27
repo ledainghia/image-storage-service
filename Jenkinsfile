@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = 'chalsfptu/image-storage-service' // Thay bằng tên image của bạn
+        IMAGE_NAME = 'chalsfptu/image-storage-service'
         CONTAINER_NAME = 'image-storage-service'
         HOSTNAME = 'image-storage'
         NETWORK_NAME = 'image-storage-network'
@@ -26,17 +26,20 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo 'Deploying'
-                // Tạo network nếu chưa có
-                sh 'docker network ls | grep -w ${NETWORK_NAME} || docker network create ${NETWORK_NAME}'
+                echo 'Creating Docker network if not exists'
+                sh '''
+                    if ! docker network ls | grep -w ${NETWORK_NAME}; then
+                        docker network create ${NETWORK_NAME}
+                    fi
+                '''
 
-                // Dừng container cũ nếu tồn tại
+                echo 'Stopping old container if exists'
                 sh 'docker container stop ${CONTAINER_NAME} || echo "this container does not exist"'
                 
-                // Dọn dẹp hệ thống Docker (container, network, volume không sử dụng)
+                echo 'Cleaning up system'
                 sh 'echo y | docker system prune'
 
-                // Chạy container mới với network và hostname
+                echo 'Deploying new container'
                 sh '''
                     docker container run -d --name ${CONTAINER_NAME} --network ${NETWORK_NAME} --hostname ${HOSTNAME} \
                     -p 3003:3003 -v /uploads:/app/uploads -v /data:/app/data ${IMAGE_NAME}:latest

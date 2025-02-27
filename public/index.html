@@ -1,0 +1,650 @@
+// public/index.html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Storage Manager</title>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      .image-container {
+        position: relative;
+        overflow: hidden;
+        padding-bottom: 100%;
+      }
+      .image-container img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-radius: 50%;
+        border-top: 4px solid #3498db;
+        width: 30px;
+        height: 30px;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-4">
+      <header class="bg-white shadow rounded-lg p-6 mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Image Storage Manager</h1>
+        <div
+          class="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center"
+        >
+          <div id="stats" class="mb-4 sm:mb-0 text-gray-600">
+            Loading statistics...
+          </div>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <label
+              class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded cursor-pointer transition"
+            >
+              Upload Image
+              <input
+                type="file"
+                id="fileInput"
+                class="hidden"
+                accept="image/*"
+              />
+            </label>
+          </div>
+        </div>
+        <div id="uploadProgress" class="mt-4 hidden">
+          <div class="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              id="progressBar"
+              class="bg-blue-600 h-2.5 rounded-full"
+              style="width: 0%"
+            ></div>
+          </div>
+          <p id="progressText" class="text-sm text-gray-600 mt-1">0%</p>
+        </div>
+      </header>
+
+      <main>
+        <div id="loading" class="flex justify-center items-center p-12">
+          <div class="spinner"></div>
+        </div>
+
+        <div
+          id="imagesContainer"
+          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+        >
+          <!-- Images will be displayed here -->
+        </div>
+
+        <div
+          id="noImages"
+          class="hidden bg-white shadow rounded-lg p-12 text-center"
+        >
+          <p class="text-gray-600 text-lg">
+            No images found. Upload your first image to get started.
+          </p>
+        </div>
+      </main>
+
+      <!-- Image Preview Modal -->
+      <div
+        id="imageModal"
+        class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden"
+      >
+        <div
+          class="bg-white rounded-lg max-w-4xl w-full max-h-screen overflow-auto"
+        >
+          <div class="p-4 border-b flex justify-between items-center">
+            <h3 id="modalTitle" class="text-xl font-semibold">Image Details</h3>
+            <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="p-6">
+            <div class="flex flex-col md:flex-row gap-6">
+              <div class="md:w-1/2">
+                <div class="bg-gray-100 rounded-lg p-2 mb-4">
+                  <img
+                    id="modalImage"
+                    src=""
+                    alt="Preview"
+                    class="w-full h-auto rounded"
+                  />
+                </div>
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-2"
+                    >Resize Image</label
+                  >
+                  <div class="flex gap-2 items-center">
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-500"
+                        >Width (px)</label
+                      >
+                      <input
+                        id="resizeWidth"
+                        type="number"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
+                      />
+                    </div>
+                    <div class="flex-1">
+                      <label class="block text-xs text-gray-500"
+                        >Height (px)</label
+                      >
+                      <input
+                        id="resizeHeight"
+                        type="number"
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
+                      />
+                    </div>
+                    <button
+                      id="resizeButton"
+                      class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 mt-5"
+                    >
+                      Preview
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="md:w-1/2">
+                <div class="mb-4">
+                  <label class="block text-sm font-medium text-gray-700 mb-2"
+                    >Image Name</label
+                  >
+                  <input
+                    id="imageName"
+                    type="text"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"
+                  />
+                  <button
+                    id="updateNameButton"
+                    class="mt-2 bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+                  >
+                    Update Name
+                  </button>
+                </div>
+                <div class="mb-4">
+                  <h4 class="font-medium text-gray-700 mb-2">Image Details</h4>
+                  <div
+                    id="imageDetails"
+                    class="bg-gray-50 p-4 rounded text-sm"
+                  ></div>
+                </div>
+                <div class="mb-4">
+                  <h4 class="font-medium text-gray-700 mb-2">Image URL</h4>
+                  <div class="flex items-center">
+                    <input
+                      id="imageUrl"
+                      type="text"
+                      readonly
+                      class="block w-full rounded-md border-gray-300 shadow-sm p-2 border bg-gray-50"
+                    />
+                    <button
+                      id="copyUrlButton"
+                      class="ml-2 bg-gray-200 p-2 rounded hover:bg-gray-300"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          x="9"
+                          y="9"
+                          width="13"
+                          height="13"
+                          rx="2"
+                          ry="2"
+                        ></rect>
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        ></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="mb-4">
+                  <h4 class="font-medium text-gray-700 mb-2">Resize URL</h4>
+                  <div class="flex items-center">
+                    <input
+                      id="resizeUrl"
+                      type="text"
+                      readonly
+                      class="block w-full rounded-md border-gray-300 shadow-sm p-2 border bg-gray-50"
+                    />
+                    <button
+                      id="copyResizeUrlButton"
+                      class="ml-2 bg-gray-200 p-2 rounded hover:bg-gray-300"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          x="9"
+                          y="9"
+                          width="13"
+                          height="13"
+                          rx="2"
+                          ry="2"
+                        ></rect>
+                        <path
+                          d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"
+                        ></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="mt-6">
+                  <button
+                    id="deleteImageButton"
+                    class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                  >
+                    Delete Image
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // DOM Elements
+      const fileInput = document.getElementById('fileInput');
+      const imagesContainer = document.getElementById('imagesContainer');
+      const statsElement = document.getElementById('stats');
+      const loadingElement = document.getElementById('loading');
+      const noImagesElement = document.getElementById('noImages');
+      const uploadProgress = document.getElementById('uploadProgress');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+
+      // Modal Elements
+      const imageModal = document.getElementById('imageModal');
+      const modalImage = document.getElementById('modalImage');
+      const modalTitle = document.getElementById('modalTitle');
+      const closeModal = document.getElementById('closeModal');
+      const imageDetails = document.getElementById('imageDetails');
+      const imageName = document.getElementById('imageName');
+      const imageUrl = document.getElementById('imageUrl');
+      const resizeUrl = document.getElementById('resizeUrl');
+      const resizeWidth = document.getElementById('resizeWidth');
+      const resizeHeight = document.getElementById('resizeHeight');
+      const resizeButton = document.getElementById('resizeButton');
+      const updateNameButton = document.getElementById('updateNameButton');
+      const deleteImageButton = document.getElementById('deleteImageButton');
+      const copyUrlButton = document.getElementById('copyUrlButton');
+      const copyResizeUrlButton = document.getElementById(
+        'copyResizeUrlButton'
+      );
+
+      // Current image being displayed in the modal
+      let currentImage = null;
+
+      // Base API URL
+      const apiUrl = '/api';
+
+      // Fetch all images
+      async function fetchImages() {
+        try {
+          loadingElement.classList.remove('hidden');
+          imagesContainer.innerHTML = '';
+
+          const response = await fetch(`${apiUrl}/images`);
+          const images = await response.json();
+
+          loadingElement.classList.add('hidden');
+
+          if (images.length === 0) {
+            noImagesElement.classList.remove('hidden');
+          } else {
+            noImagesElement.classList.add('hidden');
+            displayImages(images);
+          }
+        } catch (error) {
+          console.error('Error fetching images:', error);
+          loadingElement.classList.add('hidden');
+          noImagesElement.classList.remove('hidden');
+          noImagesElement.innerHTML =
+            '<p class="text-red-500 text-lg">Error loading images. Please try again.</p>';
+        }
+      }
+
+      // Display images in the grid
+      function displayImages(images) {
+        imagesContainer.innerHTML = '';
+
+        // Sort images by creation date (newest first)
+        images.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        images.forEach((image) => {
+          const imageCard = document.createElement('div');
+          imageCard.className = 'bg-white rounded-lg shadow overflow-hidden';
+          imageCard.innerHTML = `
+          <div class="image-container">
+            <img src="${image.path}" alt="${image.originalName}" loading="lazy">
+          </div>
+          <div class="p-4">
+            <h3 class="font-medium text-gray-800 truncate" title="${
+              image.originalName
+            }">${image.originalName}</h3>
+            <p class="text-sm text-gray-500">${formatFileSize(image.size)}</p>
+          </div>
+        `;
+
+          imageCard.addEventListener('click', () => openImageModal(image));
+          imagesContainer.appendChild(imageCard);
+        });
+      }
+
+      // Format file size
+      function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' bytes';
+        else if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        else if (bytes < 1024 * 1024 * 1024)
+          return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        else return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+      }
+
+      // Format date
+      function formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleString();
+      }
+
+      // Open image modal
+      function openImageModal(image) {
+        currentImage = image;
+
+        modalTitle.textContent = image.originalName;
+        modalImage.src = image.path;
+        imageName.value = image.originalName;
+
+        const baseUrl = window.location.origin;
+        imageUrl.value = `${baseUrl}${image.path}`;
+
+        // Reset resize inputs
+        resizeWidth.value = image.width;
+        resizeHeight.value = image.height;
+        updateResizeUrl();
+
+        // Update image details
+        imageDetails.innerHTML = `
+        <div class="grid grid-cols-2 gap-2">
+          <div class="text-gray-600">Dimensions:</div>
+          <div>${image.width} × ${image.height}px</div>
+          
+          <div class="text-gray-600">Size:</div>
+          <div>${formatFileSize(image.size)}</div>
+          
+          <div class="text-gray-600">Type:</div>
+          <div>${image.mimeType}</div>
+          
+          <div class="text-gray-600">Uploaded:</div>
+          <div>${formatDate(image.createdAt)}</div>
+          
+          <div class="text-gray-600">ID:</div>
+          <div class="truncate" title="${image.id}">${image.id}</div>
+        </div>
+      `;
+
+        imageModal.classList.remove('hidden');
+      }
+
+      // Close image modal
+      function closeImageModal() {
+        imageModal.classList.add('hidden');
+        currentImage = null;
+      }
+
+      // Update resize URL
+      function updateResizeUrl() {
+        if (!currentImage) return;
+
+        const baseUrl = window.location.origin;
+        const width = resizeWidth.value ? `width=${resizeWidth.value}` : '';
+        const height = resizeHeight.value ? `height=${resizeHeight.value}` : '';
+        const separator = width && height ? '&' : '';
+        const params = width || height ? `?${width}${separator}${height}` : '';
+
+        resizeUrl.value = `${baseUrl}/api/resize/${currentImage.id}${params}`;
+      }
+
+      // Preview resized image
+      async function previewResizedImage() {
+        if (!currentImage) return;
+
+        const width = resizeWidth.value;
+        const height = resizeHeight.value;
+
+        if (!width && !height) {
+          // Reset to original image if no dimensions provided
+          modalImage.src = currentImage.path;
+          return;
+        }
+
+        const params = new URLSearchParams();
+        if (width) params.append('width', width);
+        if (height) params.append('height', height);
+
+        modalImage.src = `/api/resize/${currentImage.id}?${params.toString()}`;
+      }
+
+      // Update image name
+      async function updateImageName() {
+        if (!currentImage) return;
+
+        const newName = imageName.value.trim();
+        if (!newName) return;
+
+        try {
+          const response = await fetch(`${apiUrl}/images/${currentImage.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ originalName: newName }),
+          });
+
+          if (response.ok) {
+            const updatedImage = await response.json();
+            modalTitle.textContent = updatedImage.originalName;
+            currentImage = updatedImage;
+
+            // Refresh the image list
+            fetchImages();
+
+            // Show success message
+            alert('Image name updated successfully!');
+          } else {
+            alert('Failed to update image name.');
+          }
+        } catch (error) {
+          console.error('Error updating image name:', error);
+          alert('Error updating image name. Please try again.');
+        }
+      }
+
+      // Delete image
+      async function deleteImage() {
+        if (!currentImage) return;
+
+        if (
+          !confirm(
+            `Are you sure you want to delete "${currentImage.originalName}"?`
+          )
+        ) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${apiUrl}/images/${currentImage.id}`, {
+            method: 'DELETE',
+          });
+
+          if (response.ok) {
+            closeImageModal();
+            fetchImages();
+            fetchStats();
+            alert('Image deleted successfully!');
+          } else {
+            alert('Failed to delete image.');
+          }
+        } catch (error) {
+          console.error('Error deleting image:', error);
+          alert('Error deleting image. Please try again.');
+        }
+      }
+
+      // Copy URL to clipboard
+      function copyToClipboard(text) {
+        navigator.clipboard
+          .writeText(text)
+          .then(() => {
+            alert('URL copied to clipboard!');
+          })
+          .catch((err) => {
+            console.error('Failed to copy URL:', err);
+            alert('Failed to copy URL. Please try again.');
+          });
+      }
+
+      // Upload image
+      function uploadImage(file) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        uploadProgress.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.open('POST', `${apiUrl}/images`, true);
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = Math.round((e.loaded / e.total) * 100);
+            progressBar.style.width = percentComplete + '%';
+            progressText.textContent = percentComplete + '%';
+          }
+        };
+
+        xhr.onload = function () {
+          uploadProgress.classList.add('hidden');
+
+          if (xhr.status === 201) {
+            const response = JSON.parse(xhr.responseText);
+            fetchImages();
+            fetchStats();
+            alert(
+              `Image "${response.image.originalName}" uploaded successfully!`
+            );
+          } else {
+            alert('Failed to upload image. Please try again.');
+          }
+        };
+
+        xhr.onerror = function () {
+          uploadProgress.classList.add('hidden');
+          alert('Error uploading image. Please try again.');
+        };
+
+        xhr.send(formData);
+      }
+
+      // Fetch statistics
+      async function fetchStats() {
+        try {
+          const response = await fetch(`${apiUrl}/stats`);
+          const stats = await response.json();
+
+          statsElement.innerHTML = `
+          <span class="font-medium">${stats.totalImages}</span> images | 
+          <span class="font-medium">${stats.formattedSize}</span> total storage used
+        `;
+        } catch (error) {
+          console.error('Error fetching stats:', error);
+          statsElement.textContent = 'Error loading statistics';
+        }
+      }
+
+      // Event Listeners
+      document.addEventListener('DOMContentLoaded', () => {
+        fetchImages();
+        fetchStats();
+
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+            uploadImage(e.target.files[0]);
+            // Reset the input
+            e.target.value = '';
+          }
+        });
+
+        closeModal.addEventListener('click', closeImageModal);
+
+        resizeWidth.addEventListener('change', updateResizeUrl);
+        resizeHeight.addEventListener('change', updateResizeUrl);
+
+        resizeButton.addEventListener('click', previewResizedImage);
+        updateNameButton.addEventListener('click', updateImageName);
+        deleteImageButton.addEventListener('click', deleteImage);
+
+        copyUrlButton.addEventListener('click', () =>
+          copyToClipboard(imageUrl.value)
+        );
+        copyResizeUrlButton.addEventListener('click', () =>
+          copyToClipboard(resizeUrl.value)
+        );
+
+        // Close modal when clicking outside the modal content
+        imageModal.addEventListener('click', (e) => {
+          if (e.target === imageModal) {
+            closeImageModal();
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

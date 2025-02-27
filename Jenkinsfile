@@ -35,9 +35,7 @@ pipeline {
 
                 echo 'Stopping old container if exists'
                 sh 'docker container stop ${CONTAINER_NAME} || echo "this container does not exist"'
-                
-                echo 'Cleaning up system'
-                sh 'echo y | docker system prune'
+   
 
                 echo 'Deploying new container'
                 sh '''

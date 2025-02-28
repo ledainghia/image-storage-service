@@ -25,6 +25,20 @@ const PORT = process.env.PORT || 3002;
 const UPLOAD_DIR = path.join(__dirname, '../uploads');
 const METADATA_FILE = path.join(__dirname, '../data/metadata.json');
 const PUBLIC_PATH = '/images';
+const AUTH_CONFIG = {
+  users: [
+    {
+      username: 'admin',
+      password: 'password123',
+      apiKey: 'lalala_key_can_use_guest_this_1@1',
+    },
+    {
+      username: 'user',
+      password: 'user456',
+      apiKey: 'lalala_key_can_use_guest_this_1@3',
+    },
+  ],
+};
 
 // Ensure directories exist
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -94,41 +108,127 @@ const getImageDimensions = async (
 };
 
 // API Routes
-// Upload image
-app.post('/api/images', upload.single('image'), async (req, res) => {
+
+interface AuthenticatedRequest extends express.Request {
+  user?: { username: string };
+}
+
+const authenticate: express.RequestHandler = (
+  req: AuthenticatedRequest,
+  res: express.Response,
+  next: express.NextFunction
+) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image file provided' });
+    // Check for API key in header
+    const apiKey = req.headers['x-api-key'] as string;
+
+    // If API key is provided, validate it
+    if (apiKey) {
+      const user = AUTH_CONFIG.users.find((u) => u.apiKey === apiKey);
+      if (user) {
+        req.user = { username: user.username };
+        return next();
+      }
     }
 
-    const filePath = req.file.path;
-    const { width, height } = await getImageDimensions(filePath);
+    // Otherwise, check for Basic authentication
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Basic ')) {
+      const base64Credentials = authHeader.split(' ')[1];
+      const credentials = Buffer.from(base64Credentials, 'base64').toString(
+        'ascii'
+      );
+      const [username, password] = credentials.split(':');
 
-    const imageMetadata: ImageMetadata = {
-      id: path.basename(filePath, path.extname(filePath)),
-      originalName: req.file.originalname,
-      path: `${PUBLIC_PATH}/${path.basename(filePath)}`,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
-      width,
-      height,
-      createdAt: new Date(),
-    };
+      const user = AUTH_CONFIG.users.find(
+        (u) => u.username === username && u.password === password
+      );
 
-    const metadata = readMetadata();
-    metadata.push(imageMetadata);
-    writeMetadata(metadata);
+      if (user) {
+        req.user = { username: user.username };
+        return next();
+      }
+    }
 
-    res.status(201).json({
-      message: 'Image uploaded successfully',
-      image: imageMetadata,
-      path: imageMetadata.path,
+    // If no valid authentication, return 401
+    res.status(401).json({ error: 'Authentication required' });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(401).json({ error: 'Authentication failed' });
+  }
+};
+
+// Add a login route
+app.post('/api/login', (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res
+        .status(400)
+        .json({ error: 'Username and password are required' });
+    }
+
+    // Find user
+    const user = AUTH_CONFIG.users.find(
+      (u) => u.username === username && u.password === password
+    );
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    res.json({
+      message: 'Login successful',
+      apiKey: user.apiKey,
+      user: { username: user.username },
     });
   } catch (error) {
-    console.error('Error uploading image:', error);
-    res.status(500).json({ error: 'Failed to upload image' });
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
+
+// Upload image
+app.post(
+  '/api/images',
+  authenticate,
+  upload.single('image'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No image file provided' });
+      }
+
+      const filePath = req.file.path;
+      const { width, height } = await getImageDimensions(filePath);
+
+      const imageMetadata: ImageMetadata = {
+        id: path.basename(filePath, path.extname(filePath)),
+        originalName: req.file.originalname,
+        path: `${PUBLIC_PATH}/${path.basename(filePath)}`,
+        size: req.file.size,
+        mimeType: req.file.mimetype,
+        width,
+        height,
+        createdAt: new Date(),
+      };
+
+      const metadata = readMetadata();
+      metadata.push(imageMetadata);
+      writeMetadata(metadata);
+
+      res.status(201).json({
+        message: 'Image uploaded successfully',
+        image: imageMetadata,
+        path: imageMetadata.path,
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      res.status(500).json({ error: 'Failed to upload image' });
+    }
+  }
+);
 
 // Get all images
 app.get('/api/images', (req, res) => {
@@ -191,7 +291,7 @@ app.get('/api/resize/:id', async (req, res) => {
 });
 
 // Delete image by ID
-app.delete('/api/images/:id', (req, res) => {
+app.delete('/api/images/:id', authenticate, (req, res) => {
   try {
     const { id } = req.params;
     const metadata = readMetadata();
@@ -221,7 +321,7 @@ app.delete('/api/images/:id', (req, res) => {
 });
 
 // Update image metadata
-app.patch('/api/images/:id', (req, res) => {
+app.patch('/api/images/:id', authenticate, (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -261,7 +361,7 @@ app.patch('/api/images/:id', (req, res) => {
 });
 
 // Get statistics
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', authenticate, (req, res) => {
   const metadata = readMetadata();
 
   const totalImages = metadata.length;

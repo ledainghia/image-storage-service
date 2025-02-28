@@ -33,8 +33,9 @@ pipeline {
                     fi
                 '''
 
-                echo 'Stopping old container if exists'
-                sh 'docker container stop ${CONTAINER_NAME} || echo "this container does not exist"'
+                echo 'Stopping and removing old container if exists'
+                sh 'docker container stop ${CONTAINER_NAME} || echo "container not running"'
+                sh 'docker container rm ${CONTAINER_NAME} || echo "container not found"'
    
 
                 echo 'Deploying new container'

@@ -113,12 +113,13 @@
               <label
                 class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded cursor-pointer transition"
               >
-                Upload Image
+                Upload Images
                 <input
                   type="file"
                   id="fileInput"
                   class="hidden"
                   accept="image/*"
+                  multiple
                 />
               </label>
             </div>
@@ -757,7 +758,16 @@
         }
 
         // Upload image
-        function uploadImage(file) {
+        // The existing uploadImage function should be updated to handle multiple files:
+        function uploadImage(files) {
+          // Check if we have multiple files
+          if (files.length > 1) {
+            uploadMultipleImages(files);
+            return;
+          }
+
+          // This is the existing single file upload logic
+          const file = files[0];
           const formData = new FormData();
           formData.append('image', file);
 
@@ -810,6 +820,72 @@
 
           xhr.send(formData);
         }
+
+        // New function to handle multiple file uploads
+        function uploadMultipleImages(files) {
+          const formData = new FormData();
+
+          // Add all files to the formData
+          Array.from(files).forEach((file) => {
+            formData.append('images', file);
+          });
+
+          uploadProgress.classList.remove('hidden');
+          progressBar.style.width = '0%';
+          progressText.textContent = '0%';
+
+          const xhr = new XMLHttpRequest();
+
+          xhr.open('POST', `${apiUrl}/images/batch`, true);
+
+          // Add API key header
+          const apiKey = localStorage.getItem('apiKey');
+          if (apiKey) {
+            xhr.setRequestHeader('X-API-Key', apiKey);
+          }
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = Math.round((e.loaded / e.total) * 100);
+              progressBar.style.width = percentComplete + '%';
+              progressText.textContent = percentComplete + '%';
+            }
+          };
+
+          xhr.onload = function () {
+            uploadProgress.classList.add('hidden');
+
+            if (xhr.status === 201) {
+              const response = JSON.parse(xhr.responseText);
+              fetchImages();
+              fetchStats();
+              alert(`${response.images.length} images uploaded successfully!`);
+            } else {
+              if (xhr.status === 401) {
+                alert('Authentication failed. Please login again.');
+                logout();
+              } else {
+                alert('Failed to upload images. Please try again.');
+              }
+            }
+          };
+
+          xhr.onerror = function () {
+            uploadProgress.classList.add('hidden');
+            alert('Error uploading images. Please try again.');
+          };
+
+          xhr.send(formData);
+        }
+
+        // Update the fileInput event listener
+        fileInput.addEventListener('change', (e) => {
+          if (e.target.files.length > 0) {
+            uploadImage(e.target.files);
+            // Reset the input
+            e.target.value = '';
+          }
+        });
 
         // Fetch statistics
         async function fetchStats() {

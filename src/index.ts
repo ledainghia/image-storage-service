@@ -190,6 +190,53 @@ app.post('/api/login', (req, res) => {
 });
 
 // Upload image
+
+app.post(
+  '/api/images/batch',
+  authenticate,
+  upload.array('images', 15), // Allow up to 10 images at once
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: 'No image files provided' });
+      }
+
+      const metadata = readMetadata();
+      const uploadedImages: ImageMetadata[] = [];
+
+      // Process each file
+      for (const file of req.files as Express.Multer.File[]) {
+        const filePath = file.path;
+        const { width, height } = await getImageDimensions(filePath);
+
+        const imageMetadata: ImageMetadata = {
+          id: path.basename(filePath, path.extname(filePath)),
+          originalName: file.originalname,
+          path: `${PUBLIC_PATH}/${path.basename(filePath)}`,
+          size: file.size,
+          mimeType: file.mimetype,
+          width,
+          height,
+          createdAt: new Date(),
+        };
+
+        metadata.push(imageMetadata);
+        uploadedImages.push(imageMetadata);
+      }
+
+      writeMetadata(metadata);
+
+      res.status(201).json({
+        message: `${uploadedImages.length} images uploaded successfully`,
+        images: uploadedImages,
+      });
+    } catch (error) {
+      console.error('Error uploading multiple images:', error);
+      res.status(500).json({ error: 'Failed to upload images' });
+    }
+  }
+);
+
 app.post(
   '/api/images',
   authenticate,
